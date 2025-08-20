@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>食品訂購頁面</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/icon-32.png">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4a90e2">
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+
+        #app {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .category-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .category-button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .category-button.active {
+            background-color: #4a90e2;
+            color: white;
+        }
+
+        .food-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .food-item {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            transition: background-color 0.3s;
+        }
+
+        .food-item.selected {
+            background-color: #e6f2ff;
+        }
+
+        .category-vegetable {
+            background-color: #e6f9e6;
+            /* 淡綠色 */
+        }
+
+        .category-meat {
+            background-color: #ffe6e6;
+            /* 淡紅色 */
+        }
+
+        .category-processed {
+            background-color: #fff5cc;
+            /* 淡黃色 */
+        }
+
+        .category-drink {
+            background-color: #e6f0ff;
+            /* 淡藍色 */
+        }
+
+        .quantity-control {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .quantity-control button {
+            width: 30px;
+            height: 30px;
+            border: none;
+            background-color: #4a90e2;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+
+        .quantity-control input {
+            width: 40px;
+            height: 30px;
+            text-align: center;
+            margin: 0 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+
+        .summary {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f8f8;
+            border-radius: 5px;
+        }
+
+        .selected-items {
+            margin-top: 10px;
+            padding-left: 20px;
+        }
+
+        .selected-items li {
+            margin-bottom: 5px;
+        }
+
+        .payment-section {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+        }
+
+        .payment-input {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .payment-input label {
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        .payment-input input {
+            width: 100px;
+            height: 30px;
+            padding: 0 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+
+        .change-amount {
+            font-weight: bold;
+            color: #4a90e2;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <div class="menu_list">
+            <div class="category-buttons">
+                <button v-for="category in categories" :key="category" @click="selectedCategory = category"
+                    :class="['category-button', selectedCategory === category ? 'active' : '']">
+                    {{ category }}
+                </button>
+            </div>
+            <div class="food-grid">
+                <div v-for="item in filteredItems" :key="item.id"
+                    :class="['food-item', selectedItems[item.id] ? 'selected' : '', categoryClass(item.category)]">
+                    <div class="font-bold">{{ item.name }}</div>
+                    <div>NT$ {{ item.price }}</div>
+                    <div class="quantity-control">
+                        <button @click="decreaseQuantity(item)">-</button>
+                        <input type="number" v-model.number="item.quantity" min="0" @input="updateQuantity(item)">
+                        <button @click="increaseQuantity(item)">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="summary">
+            <div class="font-bold">已選擇項目：{{ totalItems }}</div>
+            <ul class="selected-items">
+                <li v-for="item in selectedItemsList" :key="item.id">
+                    {{ item.name }} - {{ item.quantity }} x NT$ {{ item.price }}
+                </li>
+            </ul>
+            <div class="font-bold">總金額：NT$ {{ totalAmount }}</div>
+
+            <div class="payment-section">
+                <div class="payment-input">
+                    <label for="paymentAmount">付款金額：</label>
+                    <input type="number" id="paymentAmount" v-model.number="paymentAmount" min="0">
+                </div>
+                <div class="change-amount" v-if="changeAmount >= 0">找零金額：NT$ {{ changeAmount }}</div>
+                <div class="change-amount" style="color: red;" v-else>金額不足，還差 NT$ {{ -changeAmount }}</div>
+
+                <button @click="submitOrder"
+                    style="margin-top: 10px; padding: 10px 20px; background-color: green; color: white; border: none; border-radius: 5px;">
+                    送出訂單
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                selectedCategory: '全部分類',
+                selectedItems: {},
+                categories: ['全部分類', '蔬菜', '肉類', '加工食品', '飲品'],
+                foodItems: [
+                    { id: 1, name: '雞肉', price: 15, category: '肉類', quantity: 0 },
+                    { id: 2, name: '牛肉片', price: 20, category: '肉類', quantity: 0 },
+                    { id: 3, name: '骰子牛', price: 20, category: '肉類', quantity: 0 },
+                    { id: 4, name: '豬五花', price: 15, category: '肉類', quantity: 0 },
+
+                    { id: 5, name: '玉米筍', price: 10, category: '蔬菜', quantity: 0 },
+                    { id: 6, name: '櫛瓜', price: 10, category: '蔬菜', quantity: 0 },
+                    { id: 7, name: '馬鈴薯', price: 10, category: '蔬菜', quantity: 0 },
+                    { id: 8, name: '香菇', price: 10, category: '蔬菜', quantity: 0 },
+
+                    { id: 9, name: '小貢丸', price: 10, category: '加工食品', quantity: 0 },
+                    { id: 10, name: '豆皮', price: 10, category: '加工食品', quantity: 0 },
+                    { id: 11, name: '米血', price: 10, category: '加工食品', quantity: 0 },
+                    { id: 12, name: '海帶結', price: 10, category: '加工食品', quantity: 0 },
+                    { id: 13, name: '凍豆腐', price: 10, category: '加工食品', quantity: 0 },
+
+                    { id: 14, name: '冬瓜檸檬', price: 30, category: '飲品', quantity: 0 },
+                    { id: 15, name: '冬瓜檸檬氣泡飲', price: 35, category: '飲品', quantity: 0 },
+                    { id: 16, name: '酸梅湯', price: 35, category: '飲品', quantity: 0 },
+                    { id: 17, name: '酸梅湯氣泡飲', price: 40, category: '飲品', quantity: 0 },
+                ],
+                paymentAmount: 0
+
+            },
+            computed: {
+                filteredItems() {
+                    return this.selectedCategory === '全部分類'
+                        ? this.foodItems
+                        : this.foodItems.filter(item => item.category === this.selectedCategory);
+                },
+                totalItems() {
+                    return Object.values(this.selectedItems).reduce((sum, item) => sum + item.quantity, 0);
+                },
+                totalAmount() {
+                    return Object.values(this.selectedItems).reduce((sum, item) => sum + item.price * item.quantity, 0);
+                },
+                selectedItemsList() {
+                    return Object.values(this.selectedItems).filter(item => item.quantity > 0);
+                },
+                changeAmount() {
+                    return this.paymentAmount - this.totalAmount;
+                }
+            },
+            methods: {
+                categoryClass(category) {
+                    switch (category) {
+                        case '蔬菜':
+                            return 'category-vegetable';
+                        case '肉類':
+                            return 'category-meat';
+                        case '加工食品':
+                            return 'category-processed';
+                        case '飲品':
+                            return 'category-drink';
+                        default:
+                            return '';
+                    }
+                },
+                updateQuantity(item) {
+                    if (item.quantity > 0) {
+                        this.$set(this.selectedItems, item.id, item);
+                    } else {
+                        this.$delete(this.selectedItems, item.id);
+                    }
+                },
+                increaseQuantity(item) {
+                    item.quantity++;
+                    this.updateQuantity(item);
+                },
+                decreaseQuantity(item) {
+                    if (item.quantity > 0) {
+                        item.quantity--;
+                        this.updateQuantity(item);
+                    }
+                },
+                submitOrder() {
+                    if (this.totalItems === 0) {
+                        alert("請選擇至少一項商品");
+                        return;
+                    }
+                    if (this.changeAmount < 0) {
+                        alert("付款金額不足");
+                        return;
+                    }
+
+                    const payload = {
+                        items: this.selectedItemsList,
+                        totalAmount: this.totalAmount,
+                        paymentAmount: this.paymentAmount,
+                        changeAmount: this.changeAmount
+                    };
+
+                    fetch('https://script.google.com/macros/s/AKfycbwqFaHfFEYlckn5b2LTBOL-_9B9Xt8xOyxRho4nzcsFeaRmNDAxNLO4xrB4SsPcKvfY3Q/exec', {
+                        method: 'POST',
+                        mode: 'no-cors', // 因為 Google Apps Script 預設不支援 CORS headers
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    })
+                        .then(() => {
+                            alert("訂單已送出！");
+                            this.resetForm();
+                        })
+                        .catch(() => {
+                            alert("送出失敗，請稍後再試");
+                        });
+                },
+                resetForm() {
+                    this.foodItems.forEach(item => {
+                        item.quantity = 0;
+                    });
+                    this.selectedItems = {};
+                    this.paymentAmount = 0;
+                }
+
+            }
+        });
+    </script>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js')
+                .then(() => console.log('Service Worker 註冊成功'))
+                .catch(err => console.error('Service Worker 註冊失敗:', err));
+        }
+    </script>
+
+</body>
+
+</html>
